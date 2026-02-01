@@ -58,7 +58,13 @@ BIRDS: List[Bird] = [
         },
         moves=[
             {"name": "Scarlet Peck", "power": 70, "category": "physical"},
-            {"name": "Sunburst Aria", "power": 80, "category": "special"},
+            {
+                "name": "Sunburst Aria",
+                "power": 0,
+                "category": "special",
+                "effect": "heal",
+                "amount": 35,
+            },
             {"name": "Wing Gust", "power": 65, "category": "physical"},
         ],
     ),
@@ -86,7 +92,14 @@ BIRDS: List[Bird] = [
         moves=[
             {"name": "Harbor Spear", "power": 85, "category": "physical"},
             {"name": "Marsh Pulse", "power": 75, "category": "special"},
-            {"name": "Stillwater Guard", "power": 60, "category": "special"},
+            {
+                "name": "Stillwater Guard",
+                "power": 0,
+                "category": "special",
+                "effect": "buff",
+                "stat": "Defense",
+                "amount": 20,
+            },
         ],
     ),
     Bird(
@@ -166,7 +179,14 @@ BIRDS: List[Bird] = [
         },
         moves=[
             {"name": "Caw Slash", "power": 75, "category": "physical"},
-            {"name": "Riddle Cry", "power": 70, "category": "special"},
+            {
+                "name": "Riddle Cry",
+                "power": 0,
+                "category": "special",
+                "effect": "buff",
+                "stat": "Special Attack",
+                "amount": 20,
+            },
             {"name": "Shadow Feint", "power": 65, "category": "physical"},
         ],
     ),
@@ -194,7 +214,13 @@ BIRDS: List[Bird] = [
         moves=[
             {"name": "Nectar Beam", "power": 80, "category": "special"},
             {"name": "Ruby Jab", "power": 65, "category": "physical"},
-            {"name": "Whirl Sip", "power": 70, "category": "special"},
+            {
+                "name": "Whirl Sip",
+                "power": 0,
+                "category": "special",
+                "effect": "heal",
+                "amount": 30,
+            },
         ],
     ),
     Bird(
@@ -302,7 +328,14 @@ BIRDS: List[Bird] = [
         moves=[
             {"name": "Marsh Waltz", "power": 80, "category": "special"},
             {"name": "Reed Lance", "power": 85, "category": "physical"},
-            {"name": "Trumpet Shock", "power": 75, "category": "special"},
+            {
+                "name": "Trumpet Shock",
+                "power": 0,
+                "category": "special",
+                "effect": "buff",
+                "stat": "Special Defense",
+                "amount": 15,
+            },
         ],
     ),
     Bird(
@@ -518,7 +551,13 @@ BIRDS: List[Bird] = [
         moves=[
             {"name": "Echo Spiral", "power": 90, "category": "special"},
             {"name": "Midnight Dive", "power": 85, "category": "physical"},
-            {"name": "Lakeglow", "power": 75, "category": "special"},
+            {
+                "name": "Lakeglow",
+                "power": 0,
+                "category": "special",
+                "effect": "heal",
+                "amount": 40,
+            },
         ],
     ),
 ]

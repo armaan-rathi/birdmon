@@ -55,6 +55,16 @@ function getBirdIcon(birdId) {
   return birdIcons[birdId] ?? "🐦";
 }
 
+function describeMove(move) {
+  if (move.effect === "heal") {
+    return `Heal ${move.amount ?? 0}`;
+  }
+  if (move.effect === "buff") {
+    return `Boost ${move.stat} +${move.amount ?? 0}`;
+  }
+  return `Power ${move.power ?? 0}`;
+}
+
 export default function App() {
   const [state, setState] = useState(null);
   const [birds, setBirds] = useState([]);
@@ -195,21 +205,67 @@ export default function App() {
     setMessage("Bird released back into the wild.");
   };
 
-  const calculateDamage = (move, attacker, defender) => {
+  const calculateDamage = (move, attacker, defender, attackerBuffs, defenderBuffs) => {
     const attackStat =
       move.category === "special"
-        ? attacker.stats["Special Attack"]
-        : attacker.stats["Attack"];
+        ? attacker.stats["Special Attack"] + (attackerBuffs["Special Attack"] ?? 0)
+        : attacker.stats["Attack"] + (attackerBuffs["Attack"] ?? 0);
     const defenseStat =
       move.category === "special"
-        ? defender.stats["Special Defense"]
-        : defender.stats["Defense"];
-    const base = move.power + attackStat * 0.6 - defenseStat * 0.35;
+        ? defender.stats["Special Defense"] + (defenderBuffs["Special Defense"] ?? 0)
+        : defender.stats["Defense"] + (defenderBuffs["Defense"] ?? 0);
+    const basePower = move.power ?? 0;
+    const base = basePower * 0.6 + attackStat * 0.3 - defenseStat * 0.25;
     const variance = 0.85 + Math.random() * 0.3;
-    return Math.max(8, Math.floor(base * variance));
+    return Math.max(4, Math.floor(base * variance));
   };
 
-  const handleCpuMove = (currentBattle, updatedOpponentHp) => {
+  const applyMoveEffect = (currentBattle, move, attackerKey) => {
+    const defenderKey = attackerKey === "player" ? "opponent" : "player";
+    const attackerBuffs = currentBattle[`${attackerKey}Buffs`] ?? {};
+    const defenderBuffs = currentBattle[`${defenderKey}Buffs`] ?? {};
+    const attacker = currentBattle[attackerKey];
+    const defender = currentBattle[defenderKey];
+    const nextBattle = { ...currentBattle };
+    const logs = [];
+
+    if (move.effect === "heal") {
+      const amount = move.amount ?? 25;
+      const maxHp = attacker.stats.HP;
+      const healed = Math.min(
+        maxHp,
+        nextBattle[`${attackerKey}Hp`] + amount
+      );
+      nextBattle[`${attackerKey}Hp`] = healed;
+      logs.push(`${attacker.name} restored ${amount} HP!`);
+    }
+
+    if (move.effect === "buff") {
+      const stat = move.stat ?? "Attack";
+      const amount = move.amount ?? 10;
+      nextBattle[`${attackerKey}Buffs`] = {
+        ...attackerBuffs,
+        [stat]: (attackerBuffs[stat] ?? 0) + amount
+      };
+      logs.push(`${attacker.name} boosted ${stat} by ${amount}!`);
+    }
+
+    const damage =
+      (move.power ?? 0) > 0
+        ? calculateDamage(move, attacker, defender, attackerBuffs, defenderBuffs)
+        : 0;
+    if (damage > 0) {
+      nextBattle[`${defenderKey}Hp`] = Math.max(
+        0,
+        nextBattle[`${defenderKey}Hp`] - damage
+      );
+      logs.push(`${attacker.name} hit for ${damage} damage!`);
+    }
+
+    return { nextBattle, logs, damage };
+  };
+
+  const handleCpuMove = (currentBattle) => {
     if (!currentBattle) {
       return;
     }
@@ -217,24 +273,19 @@ export default function App() {
       currentBattle.opponent.moves[
         Math.floor(Math.random() * currentBattle.opponent.moves.length)
       ];
-    const damageToPlayer = calculateDamage(
+    const { nextBattle, logs: moveLogs } = applyMoveEffect(
+      currentBattle,
       opponentMove,
-      currentBattle.opponent,
-      currentBattle.player
+      "opponent"
     );
-    const playerHp = Math.max(0, currentBattle.playerHp - damageToPlayer);
     setBattleHighlight("opponent");
-    setBattleLog((logs) => [
-      `${currentBattle.opponent.name} used ${opponentMove.name} (${damageToPlayer})!`,
-      ...logs
+    setBattleLog((entries) => [
+      `${currentBattle.opponent.name} used ${opponentMove.name}!`,
+      ...moveLogs,
+      ...entries
     ]);
-    const nextBattle = {
-      ...currentBattle,
-      opponentHp: updatedOpponentHp,
-      playerHp
-    };
     setBattle(nextBattle);
-    if (playerHp === 0) {
+    if (nextBattle.playerHp === 0) {
       setBattleStatus("lost");
       setBattleHighlight("player");
       return;
@@ -246,23 +297,15 @@ export default function App() {
     if (!battle || battleStatus !== "in-progress" || battleTurn !== "player") {
       return;
     }
-    const damageToOpponent = calculateDamage(
-      move,
-      battle.player,
-      battle.opponent
-    );
-    const opponentHp = Math.max(0, battle.opponentHp - damageToOpponent);
+    const { nextBattle, logs: moveLogs } = applyMoveEffect(battle, move, "player");
     setBattleHighlight("player");
-    setBattleLog((logs) => [
-      `${battle.player.name} used ${move.name} (${damageToOpponent})!`,
-      ...logs
+    setBattleLog((entries) => [
+      `${battle.player.name} used ${move.name}!`,
+      ...moveLogs,
+      ...entries
     ]);
-    const nextBattle = {
-      ...battle,
-      opponentHp
-    };
     setBattle(nextBattle);
-    if (opponentHp === 0) {
+    if (nextBattle.opponentHp === 0) {
       setBattleStatus("won");
       setBattleHighlight("opponent");
       fetch("/api/level-up", {
@@ -280,7 +323,7 @@ export default function App() {
       return;
     }
     setBattleTurn("cpu");
-    setTimeout(() => handleCpuMove(nextBattle, opponentHp), 900);
+    setTimeout(() => handleCpuMove(nextBattle), 900);
   };
 
   const handleStartBattle = async () => {
@@ -303,7 +346,9 @@ export default function App() {
       player: data.player,
       opponent: data.opponent,
       playerHp: data.player.stats.HP,
-      opponentHp: data.opponent.stats.HP
+      opponentHp: data.opponent.stats.HP,
+      playerBuffs: {},
+      opponentBuffs: {}
     };
     setBattle(nextBattle);
     setBattleStatus("in-progress");
@@ -665,7 +710,9 @@ export default function App() {
                         <div className="move-name">{move.name}</div>
                         <div className="move-meta">
                           <span className="move-type">{move.category}</span>
-                          <span className="move-power">Power {move.power}</span>
+                          <span className="move-power">
+                            {describeMove(move)}
+                          </span>
                         </div>
                       </div>
                     ))}
