@@ -196,6 +196,9 @@ def reset_state() -> None:
     state["dex"] = set()
 
 
+reset_state()
+
+
 def roll_weather() -> Dict[str, str]:
     return {area["id"]: random.choice(WEATHER_TYPES) for area in AREAS}
 
@@ -232,11 +235,6 @@ def eligible_birds(area_id: str) -> List[Bird]:
     ]
     random.shuffle(birds)
     return birds[:5]
-
-
-@app.before_first_request
-def init_state() -> None:
-    reset_state()
 
 
 @app.get("/api/state")
