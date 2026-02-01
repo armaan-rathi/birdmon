@@ -566,6 +566,10 @@ state: Dict[str, object] = {
     "net_attempts": 0,
 }
 
+def roll_weather() -> Dict[str, str]:
+    return {area["id"]: random.choice(WEATHER_TYPES) for area in AREAS}
+
+
 def reset_state() -> None:
     state["time_index"] = 0
     state["area_weather"] = roll_weather()
@@ -577,10 +581,6 @@ def reset_state() -> None:
 
 
 reset_state()
-
-
-def roll_weather() -> Dict[str, str]:
-    return {area["id"]: random.choice(WEATHER_TYPES) for area in AREAS}
 
 
 def build_state_payload() -> Dict[str, object]:

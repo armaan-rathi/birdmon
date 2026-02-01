@@ -336,6 +336,13 @@ button {
   overflow-y: auto;
 }
 
+.capture-result .modal-card {
+  width: min(420px, 100%);
+  text-align: center;
+  display: grid;
+  gap: 12px;
+}
+
 .time-shift .modal-card {
   width: min(420px, 100%);
   text-align: center;
@@ -477,6 +484,13 @@ button {
   padding: 4px 8px;
   border-radius: 999px;
   font-size: 0.7rem;
+  border: none;
+  cursor: pointer;
+}
+
+.move-chip:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .move-chip.muted {

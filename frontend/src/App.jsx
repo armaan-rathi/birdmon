@@ -69,12 +69,14 @@ export default function App() {
   const [message, setMessage] = useState("");
   const [showDex, setShowDex] = useState(false);
   const [captureFeedback, setCaptureFeedback] = useState(null);
+  const [captureModal, setCaptureModal] = useState(null);
   const [timeAdvanceNotice, setTimeAdvanceNotice] = useState(false);
   const [battle, setBattle] = useState(null);
   const [battleLog, setBattleLog] = useState([]);
   const [battleStatus, setBattleStatus] = useState("idle");
   const [battleHighlight, setBattleHighlight] = useState(null);
   const [selectedBattleBird, setSelectedBattleBird] = useState("");
+  const [battleTurn, setBattleTurn] = useState("player");
 
   const teamBirds = useMemo(
     () =>
@@ -116,6 +118,7 @@ export default function App() {
     setSelectedArea(null);
     setExpedition(null);
     setCaptureFeedback(null);
+    setCaptureModal(null);
     setMessage("New time slot rolled with fresh weather patterns.");
   };
 
@@ -127,6 +130,7 @@ export default function App() {
     setExpedition(null);
     setPlayer({ team: [], box: [], dex: [], levels: {} });
     setCaptureFeedback(null);
+    setCaptureModal(null);
     setMessage("Fieldwork reset. Your team is back at HQ.");
   };
 
@@ -136,6 +140,7 @@ export default function App() {
     const data = await response.json();
     setExpedition(data);
     setCaptureFeedback(null);
+    setCaptureModal(null);
     setMessage("Prepare the net! Birds are circling the habitat.");
   };
 
@@ -150,6 +155,7 @@ export default function App() {
     setSelectedArea(null);
     setExpedition(null);
     setCaptureFeedback(null);
+    setCaptureModal(null);
     setMessage("Time advanced after repeated net throws.");
   };
 
@@ -161,15 +167,17 @@ export default function App() {
     });
     const result = await response.json();
     setCaptureFeedback({ id: bird.id, success: result.success });
+    setCaptureModal({
+      name: bird.name,
+      success: result.success,
+      location: result.location
+    });
     if (result.success) {
       const playerRes = await fetch("/api/player");
       const playerData = await playerRes.json();
       setPlayer(playerData);
-      setMessage(
-        `${bird.name} was caught and sent to your ${result.location}!`
-      );
     } else {
-      setMessage(`${bird.name} dodged the net and flew away.`);
+      setMessage("");
     }
     if (result.net_attempts && result.net_attempts % 3 === 0) {
       await autoAdvanceTime();
@@ -201,36 +209,66 @@ export default function App() {
     return Math.max(8, Math.floor(base * variance));
   };
 
-  const runBattleTurn = (currentBattle) => {
-    if (!currentBattle || battleStatus !== "in-progress") {
+  const handleCpuMove = (currentBattle, updatedOpponentHp) => {
+    if (!currentBattle) {
       return;
     }
-    const playerMove =
-      currentBattle.player.moves[
-        Math.floor(Math.random() * currentBattle.player.moves.length)
+    const opponentMove =
+      currentBattle.opponent.moves[
+        Math.floor(Math.random() * currentBattle.opponent.moves.length)
       ];
-    const damageToOpponent = calculateDamage(
-      playerMove,
-      currentBattle.player,
-      currentBattle.opponent
+    const damageToPlayer = calculateDamage(
+      opponentMove,
+      currentBattle.opponent,
+      currentBattle.player
     );
-    const opponentHp = Math.max(0, currentBattle.opponentHp - damageToOpponent);
-    setBattleHighlight("player");
+    const playerHp = Math.max(0, currentBattle.playerHp - damageToPlayer);
+    setBattleHighlight("opponent");
     setBattleLog((logs) => [
-      `${currentBattle.player.name} used ${playerMove.name} (${damageToOpponent})!`,
+      `${currentBattle.opponent.name} used ${opponentMove.name} (${damageToPlayer})!`,
       ...logs
     ]);
-    setBattle({
+    const nextBattle = {
       ...currentBattle,
+      opponentHp: updatedOpponentHp,
+      playerHp
+    };
+    setBattle(nextBattle);
+    if (playerHp === 0) {
+      setBattleStatus("lost");
+      setBattleHighlight("player");
+      return;
+    }
+    setBattleTurn("player");
+  };
+
+  const handlePlayerMove = (move) => {
+    if (!battle || battleStatus !== "in-progress" || battleTurn !== "player") {
+      return;
+    }
+    const damageToOpponent = calculateDamage(
+      move,
+      battle.player,
+      battle.opponent
+    );
+    const opponentHp = Math.max(0, battle.opponentHp - damageToOpponent);
+    setBattleHighlight("player");
+    setBattleLog((logs) => [
+      `${battle.player.name} used ${move.name} (${damageToOpponent})!`,
+      ...logs
+    ]);
+    const nextBattle = {
+      ...battle,
       opponentHp
-    });
+    };
+    setBattle(nextBattle);
     if (opponentHp === 0) {
       setBattleStatus("won");
       setBattleHighlight("opponent");
       fetch("/api/level-up", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ birdId: currentBattle.player.id })
+        body: JSON.stringify({ birdId: battle.player.id })
       })
         .then((res) => res.json())
         .then((data) => {
@@ -241,40 +279,8 @@ export default function App() {
         });
       return;
     }
-    setTimeout(() => {
-      const opponentMove =
-        currentBattle.opponent.moves[
-          Math.floor(Math.random() * currentBattle.opponent.moves.length)
-        ];
-      const damageToPlayer = calculateDamage(
-        opponentMove,
-        currentBattle.opponent,
-        currentBattle.player
-      );
-      const playerHp = Math.max(0, currentBattle.playerHp - damageToPlayer);
-      setBattleHighlight("opponent");
-      setBattleLog((logs) => [
-        `${currentBattle.opponent.name} used ${opponentMove.name} (${damageToPlayer})!`,
-        ...logs
-      ]);
-      setBattle({
-        ...currentBattle,
-        opponentHp,
-        playerHp
-      });
-      if (playerHp === 0) {
-        setBattleStatus("lost");
-        setBattleHighlight("player");
-        return;
-      }
-      setTimeout(() => {
-        runBattleTurn({
-          ...currentBattle,
-          opponentHp,
-          playerHp
-        });
-      }, 900);
-    }, 900);
+    setBattleTurn("cpu");
+    setTimeout(() => handleCpuMove(nextBattle, opponentHp), 900);
   };
 
   const handleStartBattle = async () => {
@@ -302,11 +308,11 @@ export default function App() {
     setBattle(nextBattle);
     setBattleStatus("in-progress");
     setBattleHighlight(null);
+    setBattleTurn("player");
     setBattleLog([
       `${data.opponent.name} challenged you from the wilds!`,
-      "Battle start!"
+      "Choose a move to begin."
     ]);
-    setTimeout(() => runBattleTurn(nextBattle), 800);
   };
 
   const caughtLookup = new Set(player.dex);
@@ -349,6 +355,21 @@ export default function App() {
           <div className="modal-card">
             <h2>Time Advances</h2>
             <p>Three net throws passed. The habitat shifts with time.</p>
+          </div>
+        </div>
+      )}
+      {captureModal && (
+        <div className="modal capture-result">
+          <div className="modal-card">
+            <h2>{captureModal.success ? "Capture Success!" : "Capture Missed"}</h2>
+            <p>
+              {captureModal.success
+                ? `${captureModal.name} was secured and sent to your ${captureModal.location}.`
+                : `${captureModal.name} dodged the net and slipped away.`}
+            </p>
+            <button className="primary" onClick={() => setCaptureModal(null)}>
+              Continue
+            </button>
           </div>
         </div>
       )}
@@ -538,9 +559,14 @@ export default function App() {
                 </div>
                 <div className="battle-moves">
                   {battle.player.moves.map((move) => (
-                    <span key={move.name} className="move-chip">
+                    <button
+                      key={move.name}
+                      className="move-chip"
+                      disabled={battleTurn !== "player" || battleStatus !== "in-progress"}
+                      onClick={() => handlePlayerMove(move)}
+                    >
                       {move.name}
-                    </span>
+                    </button>
                   ))}
                 </div>
               </div>
@@ -579,7 +605,10 @@ export default function App() {
               <div className={`battle-result ${battleStatus}`}>
                 {battleStatus === "won" && "Victory! Your bird leveled up."}
                 {battleStatus === "lost" && "Defeat... Heal up and try again."}
-                {battleStatus === "in-progress" && "Moves are flying!"}
+                {battleStatus === "in-progress" &&
+                  (battleTurn === "player"
+                    ? "Your turn! Choose a move."
+                    : "CPU is choosing a response...")}
               </div>
               <div className="battle-log">
                 {battleLog.slice(0, 5).map((entry, index) => (
